@@ -1,8 +1,3 @@
-"""
-CaixaViva — Dashboard de Caixa
-Streamlit + Google Sheets + Login + Planos (Básico / Profissional / Empresarial)
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -20,16 +15,6 @@ st.set_page_config(page_title="CaixaViva", page_icon="💰", layout="wide",
 def _h(s): return hashlib.sha256(s.encode()).hexdigest()
 
 CLIENTES = {
-    "demo_basico": {
-        "senha_hash": _h("demo123"), "nome": "Empresa Demo Básico",
-        "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
-        "cor": "#2563eb", "plano": "basico", "meta_mensal": 0,
-    },
-    "demo_pro": {
-        "senha_hash": _h("demo456"), "nome": "Empresa Demo Pro",
-        "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
-        "cor": "#16a34a", "plano": "profissional", "meta_mensal": 0,
-    },
     "demo_emp": {
         "senha_hash": _h("demo789"), "nome": "Empresa Demo Empresarial",
         "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
@@ -129,6 +114,7 @@ if not st.session_state.logged_in:
     st.markdown("""<div class="login-wrap">
         <div class="login-logo">💰</div>
         <div class="login-title">CaixaViva</div>
+        <div class="login-sub">PLANO EMPRESARIAL</div>
         <div class="login-sub">Dashboard financeiro em tempo real</div>
     </div>""", unsafe_allow_html=True)
     _, col_c, _ = st.columns([1,1.4,1])
