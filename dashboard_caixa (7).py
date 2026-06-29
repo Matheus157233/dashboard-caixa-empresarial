@@ -1,8 +1,3 @@
-"""
-CaixaViva — Dashboard de Caixa
-Streamlit + Google Sheets + Login + Planos (Básico / Profissional / Empresarial)
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -76,19 +71,9 @@ def deletar_lembrete(lembrete_id: int, usuario: str) -> bool:
 def _h(s): return hashlib.sha256(s.encode()).hexdigest()
 
 CLIENTES = {
-    "demo_basico": {
-        "senha_hash": _h("demo123"), "nome": "Empresa Demo Básico",
-        "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
-        "cor": "#2563eb", "plano": "basico", "meta_mensal": 0,
-    },
-    "demo_pro": {
-        "senha_hash": _h("demo456"), "nome": "Empresa Demo Pro",
-        "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
-        "cor": "#16a34a", "plano": "profissional", "meta_mensal": 0,
-    },
     "demo_emp": {
         "senha_hash": _h("demo789"), "nome": "Empresa Demo Empresarial",
-        "sheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/export?format=csv&gid=0",
+        "sheet_url": "https://docs.google.com/spreadsheets/d/1C9nreFqzailyyoilLe1OqJ-21uW5p_8UP6lMSaUn1-s/export?format=csv&gid=0",
         "cor": "#7c3aed", "plano": "empresarial", "meta_mensal": 30000,
         "alerta_saidas_pct": 60,   # alerta se saídas > 60% das entradas
     },
