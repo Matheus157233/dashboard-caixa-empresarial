@@ -78,7 +78,7 @@ CLIENTES = {
         "alerta_saidas_pct": 60,
         "filiais": {
             "Matriz": "https://docs.google.com/spreadsheets/d/1C9nreFqzailyyoilLe1OqJ-21uW5p_8UP6lMSaUn1-s/export?format=csv&gid=0",
-            "Filial 1": "https://docs.google.com/spreadsheets/d/1C9nreFqzailyyoilLe1OqJ-21uW5p_8UP6lMSaUn1-s/export?format=csv&gid=0",
+            "Filial 1": {},
         },
     },
     # ── Exemplo cliente com filiais ───────────────────────────────────────────
