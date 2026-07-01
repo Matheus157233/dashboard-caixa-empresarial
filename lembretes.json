@@ -1,12 +1,6 @@
 {
   "demo_emp": [
     {
-      "id": 1782793467297,
-      "descricao": "Aluguel ",
-      "valor": 650.0,
-      "vencimento": "2026-07-01"
-    },
-    {
       "id": 1782873211522,
       "descricao": "assinatura xbox",
       "valor": 150.0,
