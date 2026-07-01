@@ -5,6 +5,12 @@
       "descricao": "Aluguel ",
       "valor": 650.0,
       "vencimento": "2026-07-01"
+    },
+    {
+      "id": 1782873168957,
+      "descricao": "assinatura xbox",
+      "valor": 150.0,
+      "vencimento": "2026-07-01"
     }
   ]
 }
