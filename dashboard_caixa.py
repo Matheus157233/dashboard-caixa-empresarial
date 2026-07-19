@@ -284,10 +284,10 @@ def render_dashboard():
     df = df_all[(df_all["dia"]>=ini)&(df_all["dia"]<=hoje)].copy()
 
     st.markdown(f"""# 📊 Dashboard de Caixa
-    <p style='color:#64748b;font-size:13px;margin-top:-10px'>
-    {cliente['nome']} &nbsp;|&nbsp; {ini.strftime('%d/%m/%Y')} → {hoje.strftime('%d/%m/%Y')}
-    &nbsp;|&nbsp; ⏱ {datetime.now().strftime('%H:%M:%S')}
-    </p>""", unsafe_allow_html=True)
+<p style='color:#64748b;font-size:13px;margin-top:-10px'>
+{cliente['nome']} &nbsp;|&nbsp; {ini.strftime('%d/%m/%Y')} → {hoje.strftime('%d/%m/%Y')}
+&nbsp;|&nbsp; ⏱ {datetime.now().strftime('%H:%M:%S')}
+</p>""", unsafe_allow_html=True)
 
     if df.empty:
         st.warning("Nenhum registro no período. Adicione dados na planilha!"); return
