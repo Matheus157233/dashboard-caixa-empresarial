@@ -177,6 +177,25 @@ def inject_css(cor="#2563eb"):
     .alerta-msg{{font-size:17px;font-weight:700;margin-top:6px}}
     .meta-bar-bg{{background:#e2e8f0;border-radius:99px;height:18px;margin-top:10px;overflow:hidden}}
     .meta-bar-fill{{height:18px;border-radius:99px;transition:width .5s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;font-weight:700;color:#fff}}
+    .info-card{{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 22px;margin:6px 0 16px}}
+    .orc-row{{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:10px}}
+    .orc-row-head{{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}}
+    .orc-cat{{font-size:13px;font-weight:700;color:#0f172a}}
+    .orc-valores{{font-size:12px;color:#64748b;font-weight:600}}
+    .orc-sem{{background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 16px;margin-bottom:8px;font-size:12px;color:#64748b}}
+    .anexo-row{{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:8px;
+        display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:box-shadow .2s}}
+    .anexo-row:hover{{box-shadow:0 4px 16px rgba(0,0,0,.08)}}
+    .anexo-nome{{font-size:14px;font-weight:700;color:#0f172a}}
+    .anexo-link{{font-size:12px;color:{cor};text-decoration:none;font-weight:600}}
+    .anexo-link:hover{{text-decoration:underline}}
+    .upload-hint{{background:linear-gradient(135deg,{cor}0d,{cor}05);border:1px dashed {cor}55;border-radius:14px;
+        padding:16px 20px;margin-bottom:14px;font-size:13px;color:#334155}}
+    .badge-plano{{display:inline-block;background:{cor};color:#fff;border-radius:99px;padding:3px 12px;
+        font-size:11px;font-weight:700;margin-left:8px;vertical-align:middle}}
+    .empty-state{{text-align:center;padding:32px 20px;color:#94a3b8;font-size:13px;background:#f8fafc;
+        border-radius:14px;border:1px solid #e2e8f0}}
+    div[data-testid="stFileUploaderDropzone"]{{border-radius:14px}}
     </style>""", unsafe_allow_html=True)
 
 
@@ -620,7 +639,7 @@ def render_dashboard():
 
             # ── Orçamento por categoria (saídas) ──────────────────────────────────
             if tem(cliente, "orcamento_categoria"):
-                st.markdown("**📦 Orçamento por Categoria (Saídas do mês)**")
+                st.markdown('<div class="sec-emp">📦 Orçamento por Categoria (Saídas do mês)</div>', unsafe_allow_html=True)
                 categorias_saida = sorted(df_mes[df_mes["tipo"]=="Saída"]["categoria"].dropna().unique().tolist())
                 if categorias_saida:
                     if "orcamentos_categoria" not in cliente:
@@ -639,16 +658,19 @@ def render_dashboard():
                             progresso_o = min(gasto/orc*100, 100)
                             cor_o = "#ef4444" if progresso_o>=100 else "#f59e0b" if progresso_o>=80 else "#22c55e"
                             st.markdown(
-                                f"<div style='margin-bottom:4px;font-size:13px;font-weight:600;color:#0f172a'>"
-                                f"{cat} — {fmt(gasto)} de {fmt(orc)}</div>"
+                                f"<div class='orc-row'>"
+                                f"<div class='orc-row-head'><span class='orc-cat'>{cat}</span>"
+                                f"<span class='orc-valores'>{fmt(gasto)} de {fmt(orc)}</span></div>"
                                 f"<div class='meta-bar-bg'><div class='meta-bar-fill' "
-                                f"style='width:{progresso_o:.1f}%;background:{cor_o}'>{progresso_o:.0f}%</div></div>",
-                                unsafe_allow_html=True)
+                                f"style='width:{progresso_o:.1f}%;background:{cor_o}'>{progresso_o:.0f}%</div></div>"
+                                f"</div>", unsafe_allow_html=True)
                         else:
-                            st.caption(f"{cat}: sem orçamento definido (gasto atual: {fmt(gasto)})")
+                            st.markdown(
+                                f"<div class='orc-sem'>💤 <b>{cat}</b> — sem orçamento definido "
+                                f"(gasto atual: {fmt(gasto)})</div>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
                 else:
-                    st.info("Nenhuma categoria de saída no mês para definir orçamento.")
+                    st.markdown('<div class="empty-state">📦 Nenhuma categoria de saída no mês para definir orçamento.</div>', unsafe_allow_html=True)
             else:
                 bloqueio("Orçamento por Categoria", "Empresarial")
 
@@ -982,22 +1004,25 @@ def render_dashboard():
             categorias_disp = sorted(df["categoria"].dropna().unique().tolist())
             tipos_disp = [t for t in ["Entrada","Saída"] if t in df["tipo"].unique()]
 
-            fcol1, fcol2 = st.columns(2)
-            with fcol1:
-                cats_sel = st.multiselect("Categorias", categorias_disp, default=categorias_disp, key="rel_cats_sel")
-            with fcol2:
-                tipos_sel = st.multiselect("Tipo", tipos_disp, default=tipos_disp, key="rel_tipos_sel")
+            with st.container(border=True):
+                fcol1, fcol2 = st.columns(2)
+                with fcol1:
+                    cats_sel = st.multiselect("Categorias", categorias_disp, default=categorias_disp, key="rel_cats_sel")
+                with fcol2:
+                    tipos_sel = st.multiselect("Tipo", tipos_disp, default=tipos_disp, key="rel_tipos_sel")
 
             df_rel = (df[df["categoria"].isin(cats_sel) & df["tipo"].isin(tipos_sel)]
                       if cats_sel and tipos_sel else df.iloc[0:0])
 
             if not df_rel.empty:
+                st.markdown("<br>", unsafe_allow_html=True)
                 ent_rel = df_rel[df_rel["tipo"]=="Entrada"]["valor"].sum()
                 sai_rel = df_rel[df_rel["tipo"]=="Saída"]["valor"].sum()
                 rr1, rr2, rr3 = st.columns(3)
                 rr1.markdown(f'<div class="kpi green"><div class="kpi-label">📈 Entradas filtradas</div><div class="kpi-value">{fmt(ent_rel)}</div></div>', unsafe_allow_html=True)
                 rr2.markdown(f'<div class="kpi red"><div class="kpi-label">📉 Saídas filtradas</div><div class="kpi-value">{fmt(sai_rel)}</div></div>', unsafe_allow_html=True)
                 rr3.markdown(f'<div class="kpi blue"><div class="kpi-label">💼 Saldo filtrado</div><div class="kpi-value">{fmt(ent_rel-sai_rel)}</div></div>', unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
 
                 comp_rel = df_rel.groupby(["categoria","tipo"])["valor"].sum().reset_index()
                 fig_rel = px.bar(comp_rel, x="categoria", y="valor", color="tipo", barmode="group",
@@ -1015,7 +1040,7 @@ def render_dashboard():
                     file_name=f"relatorio_filtrado_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv", use_container_width=True, key="download_relatorio_filtrado")
             else:
-                st.info("Selecione ao menos uma categoria e um tipo para ver o relatório.")
+                st.markdown('<div class="empty-state">🔎 Selecione ao menos uma categoria e um tipo para ver o relatório.</div>', unsafe_allow_html=True)
             st.divider()
         else:
             bloqueio("Relatório com Filtros por Categoria", "Profissional")
@@ -1071,9 +1096,13 @@ def render_dashboard():
     with tab_importar:
         st.markdown('<div class="sec">📥 Importar Extrato Bancário (CSV / OFX)</div>', unsafe_allow_html=True)
         if tem(cliente, "importar_extrato"):
-            st.caption("Envie o extrato do banco em CSV ou OFX para organizar e visualizar aqui. "
-                       "Depois é só baixar o CSV já formatado e colar na planilha oficial do CaixaViva.")
-            arquivo_extrato = st.file_uploader("Extrato (.csv ou .ofx)", type=["csv", "ofx", "txt"], key="uploader_extrato")
+            st.markdown(
+                '<div class="upload-hint">💡 Envie o extrato do banco em <b>CSV</b> ou <b>OFX</b> para organizar '
+                'e visualizar aqui. Depois é só baixar o CSV já formatado e colar na planilha oficial do CaixaViva.</div>',
+                unsafe_allow_html=True)
+
+            with st.container(border=True):
+                arquivo_extrato = st.file_uploader("Extrato (.csv ou .ofx)", type=["csv", "ofx", "txt"], key="uploader_extrato")
 
             if arquivo_extrato is not None:
                 nome_arq  = arquivo_extrato.name.lower()
@@ -1126,11 +1155,8 @@ def render_dashboard():
 
                     if df_import is not None and not df_import.empty and "data" in df_import.columns:
                         df_import = df_import.dropna(subset=["data"])
+                        st.markdown("<br>", unsafe_allow_html=True)
                         st.success(f"✅ {len(df_import)} lançamentos lidos do arquivo.")
-                        cols_import = [c for c in ["data","descricao","categoria","tipo","valor"] if c in df_import.columns]
-                        preview = df_import[cols_import].copy().sort_values("data", ascending=False)
-                        preview["data"] = preview["data"].dt.strftime("%d/%m/%Y")
-                        st.dataframe(preview, use_container_width=True, height=300)
 
                         ent_imp = df_import[df_import["tipo"]=="Entrada"]["valor"].sum() if "tipo" in df_import.columns else 0
                         sai_imp = df_import[df_import["tipo"]=="Saída"]["valor"].sum() if "tipo" in df_import.columns else 0
@@ -1138,6 +1164,14 @@ def render_dashboard():
                         ii1.markdown(f'<div class="kpi green"><div class="kpi-label">📈 Entradas no arquivo</div><div class="kpi-value">{fmt(ent_imp)}</div></div>', unsafe_allow_html=True)
                         ii2.markdown(f'<div class="kpi red"><div class="kpi-label">📉 Saídas no arquivo</div><div class="kpi-value">{fmt(sai_imp)}</div></div>', unsafe_allow_html=True)
                         ii3.markdown(f'<div class="kpi blue"><div class="kpi-label">💼 Saldo do arquivo</div><div class="kpi-value">{fmt(ent_imp-sai_imp)}</div></div>', unsafe_allow_html=True)
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+                        cols_import = [c for c in ["data","descricao","categoria","tipo","valor"] if c in df_import.columns]
+                        preview = df_import[cols_import].copy().sort_values("data", ascending=False)
+                        preview["data"] = preview["data"].dt.strftime("%d/%m/%Y")
+                        st.markdown('<div class="orc-cat" style="margin-bottom:8px">🗂️ Lançamentos identificados</div>', unsafe_allow_html=True)
+                        st.dataframe(preview, use_container_width=True, height=300)
+                        st.markdown("<br>", unsafe_allow_html=True)
 
                         csv_pronto = df_import[cols_import].copy()
                         csv_pronto["data"] = pd.to_datetime(csv_pronto["data"]).dt.strftime("%d/%m/%Y")
@@ -1162,7 +1196,9 @@ def render_dashboard():
     with tab_anexos:
         st.markdown('<div class="sec">📎 Anexos de Lançamentos</div>', unsafe_allow_html=True)
         if tem(cliente, "anexos"):
-            st.caption("Vincule comprovantes, notas fiscais ou contratos (link do Google Drive, Dropbox etc.) a um lançamento.")
+            st.markdown(
+                '<div class="upload-hint">💡 Vincule comprovantes, notas fiscais ou contratos '
+                '(link do Google Drive, Dropbox etc.) a um lançamento.</div>', unsafe_allow_html=True)
 
             usuario_anx = st.session_state.usuario
             anexos      = carregar_anexos(usuario_anx)
@@ -1172,7 +1208,7 @@ def render_dashboard():
             opcoes_lanc["label"] = opcoes_lanc.apply(
                 lambda r: f"{r['data'].strftime('%d/%m/%Y')} — {r['descricao']} — {fmt(r['valor'])}", axis=1)
 
-            with st.expander("➕ Anexar comprovante a um lançamento"):
+            with st.expander("➕ Anexar comprovante a um lançamento", expanded=not anexos):
                 if not opcoes_lanc.empty:
                     escolha     = st.selectbox("Lançamento", opcoes_lanc["label"].tolist(), key="anexo_lancamento_select")
                     nome_anexo  = st.text_input("Nome do anexo", placeholder="Ex: Nota fiscal 1234", key="anexo_nome_input")
@@ -1185,18 +1221,24 @@ def render_dashboard():
                         else:
                             st.warning("Cole o link do comprovante antes de salvar.")
                 else:
-                    st.info("Nenhum lançamento disponível no período para anexar.")
+                    st.markdown('<div class="empty-state">📎 Nenhum lançamento disponível no período para anexar.</div>', unsafe_allow_html=True)
 
+            st.markdown("<br>", unsafe_allow_html=True)
             if anexos:
-                st.markdown("**📋 Anexos cadastrados**")
+                st.markdown('<div class="sec-emp" style="margin-top:0">📋 Anexos cadastrados</div>', unsafe_allow_html=True)
                 for a in sorted(anexos, key=lambda x: x["id"], reverse=True):
-                    ca, cb, cc = st.columns([3,3,1])
-                    ca.write(f"**{a['nome']}**")
-                    cb.markdown(f"[🔗 {a['lancamento']}]({a['url']})")
-                    if cc.button("🗑️", key=f"del_anx_{a['id']}", help="Remover"):
-                        if deletar_anexo(a["id"], usuario_anx): st.rerun()
+                    cl, cr = st.columns([9,1])
+                    with cl:
+                        st.markdown(
+                            f'<div class="anexo-row"><div>'
+                            f'<div class="anexo-nome">📄 {a["nome"]}</div>'
+                            f'<a class="anexo-link" href="{a["url"]}" target="_blank">🔗 {a["lancamento"]}</a>'
+                            f'</div></div>', unsafe_allow_html=True)
+                    with cr:
+                        if st.button("🗑️", key=f"del_anx_{a['id']}", help="Remover"):
+                            if deletar_anexo(a["id"], usuario_anx): st.rerun()
             else:
-                st.info("Nenhum anexo cadastrado ainda.")
+                st.markdown('<div class="empty-state">📎 Nenhum anexo cadastrado ainda.</div>', unsafe_allow_html=True)
         else:
             bloqueio("Anexos de Lançamentos", "Profissional")
 
