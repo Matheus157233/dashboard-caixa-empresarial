@@ -984,9 +984,9 @@ def render_dashboard():
 
             fcol1, fcol2 = st.columns(2)
             with fcol1:
-                cats_sel = st.multiselect("Categorias", categorias_disp, default=categorias_disp)
+                cats_sel = st.multiselect("Categorias", categorias_disp, default=categorias_disp, key="rel_cats_sel")
             with fcol2:
-                tipos_sel = st.multiselect("Tipo", tipos_disp, default=tipos_disp)
+                tipos_sel = st.multiselect("Tipo", tipos_disp, default=tipos_disp, key="rel_tipos_sel")
 
             df_rel = (df[df["categoria"].isin(cats_sel) & df["tipo"].isin(tipos_sel)]
                       if cats_sel and tipos_sel else df.iloc[0:0])
@@ -1008,12 +1008,12 @@ def render_dashboard():
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                     legend=dict(orientation="h", yanchor="bottom", y=1.02),
                     yaxis=dict(tickprefix="R$ ", gridcolor="#f1f5f9"))
-                st.plotly_chart(fig_rel, use_container_width=True)
+                st.plotly_chart(fig_rel, use_container_width=True, key="chart_relatorio_filtrado")
 
                 st.download_button("⬇️ Baixar relatório filtrado (CSV)",
                     data=df_rel[cols_show].to_csv(index=False).encode("utf-8-sig"),
                     file_name=f"relatorio_filtrado_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv", use_container_width=True)
+                    mime="text/csv", use_container_width=True, key="download_relatorio_filtrado")
             else:
                 st.info("Selecione ao menos uma categoria e um tipo para ver o relatório.")
             st.divider()
@@ -1073,7 +1073,7 @@ def render_dashboard():
         if tem(cliente, "importar_extrato"):
             st.caption("Envie o extrato do banco em CSV ou OFX para organizar e visualizar aqui. "
                        "Depois é só baixar o CSV já formatado e colar na planilha oficial do CaixaViva.")
-            arquivo_extrato = st.file_uploader("Extrato (.csv ou .ofx)", type=["csv", "ofx", "txt"])
+            arquivo_extrato = st.file_uploader("Extrato (.csv ou .ofx)", type=["csv", "ofx", "txt"], key="uploader_extrato")
 
             if arquivo_extrato is not None:
                 nome_arq  = arquivo_extrato.name.lower()
@@ -1144,7 +1144,7 @@ def render_dashboard():
                         st.download_button("⬇️ Baixar CSV pronto para colar na planilha",
                             data=csv_pronto.to_csv(index=False).encode("utf-8-sig"),
                             file_name=f"extrato_importado_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                            mime="text/csv", use_container_width=True)
+                            mime="text/csv", use_container_width=True, key="download_csv_extrato")
                     else:
                         st.warning("Não foi possível identificar lançamentos válidos no arquivo enviado.")
                 except Exception as e:
@@ -1174,10 +1174,10 @@ def render_dashboard():
 
             with st.expander("➕ Anexar comprovante a um lançamento"):
                 if not opcoes_lanc.empty:
-                    escolha     = st.selectbox("Lançamento", opcoes_lanc["label"].tolist())
-                    nome_anexo  = st.text_input("Nome do anexo", placeholder="Ex: Nota fiscal 1234")
-                    url_anexo   = st.text_input("Link do comprovante", placeholder="https://drive.google.com/...")
-                    if st.button("💾 Salvar anexo", use_container_width=True, type="primary"):
+                    escolha     = st.selectbox("Lançamento", opcoes_lanc["label"].tolist(), key="anexo_lancamento_select")
+                    nome_anexo  = st.text_input("Nome do anexo", placeholder="Ex: Nota fiscal 1234", key="anexo_nome_input")
+                    url_anexo   = st.text_input("Link do comprovante", placeholder="https://drive.google.com/...", key="anexo_url_input")
+                    if st.button("💾 Salvar anexo", use_container_width=True, type="primary", key="btn_salvar_anexo"):
                         if url_anexo:
                             if salvar_anexo(usuario_anx, escolha, url_anexo, nome_anexo or "Anexo"):
                                 st.success("✅ Anexo salvo!")
