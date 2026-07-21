@@ -21,22 +21,22 @@ def _headers():
     return {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}",
             "Accept": "application/vnd.github.v3+json"}
 
-def _api_url():
-    return f"https://api.github.com/repos/{st.secrets['GITHUB_REPO']}/contents/{ARQUIVO}"
+def _api_url(arquivo: str = ARQUIVO):
+    return f"https://api.github.com/repos/{st.secrets['GITHUB_REPO']}/contents/{arquivo}"
 
-def _ler_github() -> tuple:
-    r = requests.get(_api_url(), headers=_headers())
+def _ler_github(arquivo: str = ARQUIVO) -> tuple:
+    r = requests.get(_api_url(arquivo), headers=_headers())
     if r.status_code == 404: return {}, ""
     r.raise_for_status()
     j = r.json()
     conteudo = base64.b64decode(j["content"]).decode("utf-8")
     return (json.loads(conteudo) if conteudo.strip() else {}), j["sha"]
 
-def _salvar_github(dados: dict, sha: str):
+def _salvar_github(dados: dict, sha: str, arquivo: str = ARQUIVO):
     conteudo = base64.b64encode(json.dumps(dados, ensure_ascii=False, indent=2).encode()).decode()
-    body = {"message": "Atualiza lembretes", "content": conteudo}
+    body = {"message": "Atualiza dados", "content": conteudo}
     if sha: body["sha"] = sha
-    requests.put(_api_url(), headers=_headers(), json=body).raise_for_status()
+    requests.put(_api_url(arquivo), headers=_headers(), json=body).raise_for_status()
 
 def carregar_lembretes(usuario: str) -> list:
     try:
@@ -64,6 +64,43 @@ def deletar_lembrete(lembrete_id: int, usuario: str) -> bool:
         _salvar_github(dados, sha); return True
     except Exception as e:
         st.error(f"Erro ao deletar: {e}"); return False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ANEXOS — comprovantes/notas vinculados a lançamentos, salvos em anexos.json
+#  (mesmo padrão gratuito dos lembretes: só um link, não guarda o arquivo em si)
+# ══════════════════════════════════════════════════════════════════════════════
+ARQUIVO_ANEXOS = "anexos.json"
+
+def carregar_anexos(usuario: str) -> list:
+    try:
+        dados, _ = _ler_github(ARQUIVO_ANEXOS)
+        return dados.get(usuario, [])
+    except Exception:
+        return []
+
+def salvar_anexo(usuario: str, lancamento: str, url: str, nome: str) -> bool:
+    try:
+        dados, sha = _ler_github(ARQUIVO_ANEXOS)
+        if usuario not in dados: dados[usuario] = []
+        dados[usuario].append({
+            "id": int(time.time() * 1000),
+            "lancamento": lancamento,
+            "url": url,
+            "nome": nome,
+        })
+        _salvar_github(dados, sha, ARQUIVO_ANEXOS); return True
+    except Exception as e:
+        st.error(f"Erro ao salvar anexo: {e}"); return False
+
+def deletar_anexo(anexo_id: int, usuario: str) -> bool:
+    try:
+        dados, sha = _ler_github(ARQUIVO_ANEXOS)
+        if usuario in dados:
+            dados[usuario] = [a for a in dados[usuario] if a["id"] != anexo_id]
+        _salvar_github(dados, sha, ARQUIVO_ANEXOS); return True
+    except Exception as e:
+        st.error(f"Erro ao deletar anexo: {e}"); return False
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  CLIENTES  —  adicione/edite aqui
@@ -98,11 +135,13 @@ CLIENTES = {
 
 PLANOS = {
     "basico":       {"fluxo", "pizza"},
-    "profissional": {"fluxo","pizza","barras","mensal","top","tabela","filtro_avancado","lembretes","dre"},
+    "profissional": {"fluxo","pizza","barras","mensal","top","tabela","filtro_avancado","lembretes","dre",
+                     "importar_extrato","relatorio_avancado","anexos"},
     "empresarial":  {"fluxo","pizza","barras","mensal","top","tabela","filtro_avancado","lembretes",
                      "resumo_hoje","comparativo","alertas","tendencia","dias_positivo","meta",
                      "pdf","ticket_medio","resumo_semanal","cores_categoria",
-                     "inadimplencia","ponto_equilibrio","filiais","previsao","dre"},
+                     "inadimplencia","ponto_equilibrio","filiais","previsao","dre",
+                     "importar_extrato","relatorio_avancado","anexos","orcamento_categoria"},
 }
 
 def tem(cl, r): return r in PLANOS.get(cl.get("plano","basico"), set())
@@ -328,8 +367,9 @@ def render_dashboard():
     #  ABAS — tudo que era mostrado em sequência agora é organizado aqui
     #  (nada foi removido, só reagrupado)
     # ══════════════════════════════════════════════════════════════════════════════
-    tab_visao, tab_dre, tab_emp, tab_lembretes, tab_relatorios = st.tabs(
-        ["📊 Visão Geral", "📑 DRE", "💎 Painel Empresarial", "🔔 Lembretes", "📄 Relatórios"]
+    tab_visao, tab_dre, tab_emp, tab_lembretes, tab_relatorios, tab_importar, tab_anexos = st.tabs(
+        ["📊 Visão Geral", "📑 DRE", "💎 Painel Empresarial", "🔔 Lembretes", "📄 Relatórios",
+         "📥 Importar Extrato", "📎 Anexos"]
     )
 
     # ────────────────────────────────────────────────────────────────────────────
@@ -577,6 +617,40 @@ def render_dashboard():
                     f'{"✅ Meta atingida!" if progresso>=100 else f"Faltam {fmt(faltam)} para atingir a meta"}'
                     f'</div></div>', unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
+
+            # ── Orçamento por categoria (saídas) ──────────────────────────────────
+            if tem(cliente, "orcamento_categoria"):
+                st.markdown("**📦 Orçamento por Categoria (Saídas do mês)**")
+                categorias_saida = sorted(df_mes[df_mes["tipo"]=="Saída"]["categoria"].dropna().unique().tolist())
+                if categorias_saida:
+                    if "orcamentos_categoria" not in cliente:
+                        cliente["orcamentos_categoria"] = {}
+                    with st.expander("⚙️ Definir orçamento por categoria"):
+                        for cat in categorias_saida:
+                            valor_atual = cliente["orcamentos_categoria"].get(cat, 0)
+                            cliente["orcamentos_categoria"][cat] = st.number_input(
+                                f"Orçamento — {cat} (R$)", min_value=0, value=int(valor_atual),
+                                step=100, key=f"orc_{cat}")
+                    gasto_por_cat = df_mes[df_mes["tipo"]=="Saída"].groupby("categoria")["valor"].sum()
+                    for cat in categorias_saida:
+                        orc   = cliente["orcamentos_categoria"].get(cat, 0)
+                        gasto = gasto_por_cat.get(cat, 0)
+                        if orc > 0:
+                            progresso_o = min(gasto/orc*100, 100)
+                            cor_o = "#ef4444" if progresso_o>=100 else "#f59e0b" if progresso_o>=80 else "#22c55e"
+                            st.markdown(
+                                f"<div style='margin-bottom:4px;font-size:13px;font-weight:600;color:#0f172a'>"
+                                f"{cat} — {fmt(gasto)} de {fmt(orc)}</div>"
+                                f"<div class='meta-bar-bg'><div class='meta-bar-fill' "
+                                f"style='width:{progresso_o:.1f}%;background:{cor_o}'>{progresso_o:.0f}%</div></div>",
+                                unsafe_allow_html=True)
+                        else:
+                            st.caption(f"{cat}: sem orçamento definido (gasto atual: {fmt(gasto)})")
+                    st.markdown("<br>", unsafe_allow_html=True)
+                else:
+                    st.info("Nenhuma categoria de saída no mês para definir orçamento.")
+            else:
+                bloqueio("Orçamento por Categoria", "Empresarial")
 
             # ── Indicador de dias para fechar positivo ────────────────────────────
             if tem(cliente, "dias_positivo"):
@@ -903,8 +977,51 @@ def render_dashboard():
     #  ABA 5 — RELATÓRIOS (PDF)
     # ────────────────────────────────────────────────────────────────────────────
     with tab_relatorios:
+        if tem(cliente, "relatorio_avancado"):
+            st.markdown('<div class="sec">🔎 Relatório com Filtros por Categoria</div>', unsafe_allow_html=True)
+            categorias_disp = sorted(df["categoria"].dropna().unique().tolist())
+            tipos_disp = [t for t in ["Entrada","Saída"] if t in df["tipo"].unique()]
+
+            fcol1, fcol2 = st.columns(2)
+            with fcol1:
+                cats_sel = st.multiselect("Categorias", categorias_disp, default=categorias_disp)
+            with fcol2:
+                tipos_sel = st.multiselect("Tipo", tipos_disp, default=tipos_disp)
+
+            df_rel = (df[df["categoria"].isin(cats_sel) & df["tipo"].isin(tipos_sel)]
+                      if cats_sel and tipos_sel else df.iloc[0:0])
+
+            if not df_rel.empty:
+                ent_rel = df_rel[df_rel["tipo"]=="Entrada"]["valor"].sum()
+                sai_rel = df_rel[df_rel["tipo"]=="Saída"]["valor"].sum()
+                rr1, rr2, rr3 = st.columns(3)
+                rr1.markdown(f'<div class="kpi green"><div class="kpi-label">📈 Entradas filtradas</div><div class="kpi-value">{fmt(ent_rel)}</div></div>', unsafe_allow_html=True)
+                rr2.markdown(f'<div class="kpi red"><div class="kpi-label">📉 Saídas filtradas</div><div class="kpi-value">{fmt(sai_rel)}</div></div>', unsafe_allow_html=True)
+                rr3.markdown(f'<div class="kpi blue"><div class="kpi-label">💼 Saldo filtrado</div><div class="kpi-value">{fmt(ent_rel-sai_rel)}</div></div>', unsafe_allow_html=True)
+
+                comp_rel = df_rel.groupby(["categoria","tipo"])["valor"].sum().reset_index()
+                fig_rel = px.bar(comp_rel, x="categoria", y="valor", color="tipo", barmode="group",
+                    color_discrete_map={"Entrada":"#22c55e","Saída":"#ef4444"}, text_auto=".2s",
+                    labels={"valor":"","categoria":"","tipo":""})
+                fig_rel.update_traces(textposition="outside", hovertemplate="<b>%{x}</b><br>R$ %{y:,.2f}<extra></extra>")
+                fig_rel.update_layout(height=290, margin=dict(l=0,r=0,t=8,b=0),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                    yaxis=dict(tickprefix="R$ ", gridcolor="#f1f5f9"))
+                st.plotly_chart(fig_rel, use_container_width=True)
+
+                st.download_button("⬇️ Baixar relatório filtrado (CSV)",
+                    data=df_rel[cols_show].to_csv(index=False).encode("utf-8-sig"),
+                    file_name=f"relatorio_filtrado_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv", use_container_width=True)
+            else:
+                st.info("Selecione ao menos uma categoria e um tipo para ver o relatório.")
+            st.divider()
+        else:
+            bloqueio("Relatório com Filtros por Categoria", "Profissional")
+
+        st.markdown('<div class="sec-emp">📄 Exportar Relatório</div>', unsafe_allow_html=True)
         if tem(cliente, "pdf"):
-            st.markdown('<div class="sec-emp">📄 Exportar Relatório</div>', unsafe_allow_html=True)
             if st.button("📥 Gerar relatório em PDF", use_container_width=True, type="primary"):
                 try:
                     from fpdf import FPDF
@@ -944,6 +1061,144 @@ def render_dashboard():
         else:
             bloqueio("Exportar Relatório em PDF", "Empresarial")
 
+
+    # ────────────────────────────────────────────────────────────────────────────
+    #  ABA 6 — IMPORTAR EXTRATO (CSV / OFX)
+    #  Leitura e organização gratuitas: não escreve na planilha oficial (isso
+    #  exigiria uma API paga/gspread com conta de serviço), mas deixa o extrato
+    #  pronto pra colar na planilha do CaixaViva.
+    # ────────────────────────────────────────────────────────────────────────────
+    with tab_importar:
+        st.markdown('<div class="sec">📥 Importar Extrato Bancário (CSV / OFX)</div>', unsafe_allow_html=True)
+        if tem(cliente, "importar_extrato"):
+            st.caption("Envie o extrato do banco em CSV ou OFX para organizar e visualizar aqui. "
+                       "Depois é só baixar o CSV já formatado e colar na planilha oficial do CaixaViva.")
+            arquivo_extrato = st.file_uploader("Extrato (.csv ou .ofx)", type=["csv", "ofx", "txt"])
+
+            if arquivo_extrato is not None:
+                nome_arq  = arquivo_extrato.name.lower()
+                df_import = None
+                try:
+                    if nome_arq.endswith(".ofx"):
+                        try:
+                            from ofxparse import OfxParser
+                            ofx = OfxParser.parse(arquivo_extrato)
+                            linhas = []
+                            for conta in ofx.accounts:
+                                for t in conta.statement.transactions:
+                                    valor_t = float(t.amount)
+                                    linhas.append({
+                                        "data": pd.to_datetime(t.date).tz_localize(None),
+                                        "descricao": t.memo or t.payee or "Sem descrição",
+                                        "categoria": "A categorizar",
+                                        "tipo": "Entrada" if valor_t >= 0 else "Saída",
+                                        "valor": abs(valor_t),
+                                    })
+                            df_import = pd.DataFrame(linhas)
+                        except ImportError:
+                            st.info("Para importar arquivos OFX, adicione `ofxparse` no `requirements.txt` "
+                                    "(biblioteca gratuita/open-source).")
+                    else:
+                        df_raw = pd.read_csv(arquivo_extrato)
+                        df_raw.columns = df_raw.columns.str.strip()
+                        col_map_i = {}
+                        for c in df_raw.columns:
+                            cl = c.lower()
+                            if   "data"  in cl: col_map_i[c] = "data"
+                            elif "escri" in cl or "desc" in cl or "hist" in cl: col_map_i[c] = "descricao"
+                            elif "egori" in cl: col_map_i[c] = "categoria"
+                            elif "tipo"  in cl: col_map_i[c] = "tipo"
+                            elif "alor"  in cl: col_map_i[c] = "valor"
+                        df_raw = df_raw.rename(columns=col_map_i)
+                        if "data" in df_raw.columns:
+                            df_raw["data"] = pd.to_datetime(df_raw["data"], dayfirst=True, errors="coerce")
+                        if "valor" in df_raw.columns:
+                            df_raw["valor"] = pd.to_numeric(
+                                df_raw["valor"].astype(str).str.replace("R$", "", regex=False)
+                                .str.replace(".", "", regex=False).str.replace(",", ".", regex=False).str.strip(),
+                                errors="coerce").fillna(0)
+                        if "tipo" not in df_raw.columns and "valor" in df_raw.columns:
+                            df_raw["tipo"]  = df_raw["valor"].apply(lambda v: "Entrada" if v >= 0 else "Saída")
+                            df_raw["valor"] = df_raw["valor"].abs()
+                        if "categoria" not in df_raw.columns:
+                            df_raw["categoria"] = "A categorizar"
+                        df_import = df_raw
+
+                    if df_import is not None and not df_import.empty and "data" in df_import.columns:
+                        df_import = df_import.dropna(subset=["data"])
+                        st.success(f"✅ {len(df_import)} lançamentos lidos do arquivo.")
+                        cols_import = [c for c in ["data","descricao","categoria","tipo","valor"] if c in df_import.columns]
+                        preview = df_import[cols_import].copy().sort_values("data", ascending=False)
+                        preview["data"] = preview["data"].dt.strftime("%d/%m/%Y")
+                        st.dataframe(preview, use_container_width=True, height=300)
+
+                        ent_imp = df_import[df_import["tipo"]=="Entrada"]["valor"].sum() if "tipo" in df_import.columns else 0
+                        sai_imp = df_import[df_import["tipo"]=="Saída"]["valor"].sum() if "tipo" in df_import.columns else 0
+                        ii1, ii2, ii3 = st.columns(3)
+                        ii1.markdown(f'<div class="kpi green"><div class="kpi-label">📈 Entradas no arquivo</div><div class="kpi-value">{fmt(ent_imp)}</div></div>', unsafe_allow_html=True)
+                        ii2.markdown(f'<div class="kpi red"><div class="kpi-label">📉 Saídas no arquivo</div><div class="kpi-value">{fmt(sai_imp)}</div></div>', unsafe_allow_html=True)
+                        ii3.markdown(f'<div class="kpi blue"><div class="kpi-label">💼 Saldo do arquivo</div><div class="kpi-value">{fmt(ent_imp-sai_imp)}</div></div>', unsafe_allow_html=True)
+
+                        csv_pronto = df_import[cols_import].copy()
+                        csv_pronto["data"] = pd.to_datetime(csv_pronto["data"]).dt.strftime("%d/%m/%Y")
+                        st.download_button("⬇️ Baixar CSV pronto para colar na planilha",
+                            data=csv_pronto.to_csv(index=False).encode("utf-8-sig"),
+                            file_name=f"extrato_importado_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv", use_container_width=True)
+                    else:
+                        st.warning("Não foi possível identificar lançamentos válidos no arquivo enviado.")
+                except Exception as e:
+                    st.error("Erro ao ler o arquivo. Confira o formato e tente novamente.")
+                    st.code(str(e))
+        else:
+            bloqueio("Importar Extrato Bancário", "Profissional")
+
+
+    # ────────────────────────────────────────────────────────────────────────────
+    #  ABA 7 — ANEXOS DE LANÇAMENTOS
+    #  Guarda só o link do comprovante (Drive, Dropbox etc.), não o arquivo em si
+    #  — mesmo padrão gratuito já usado nos Lembretes (GitHub JSON).
+    # ────────────────────────────────────────────────────────────────────────────
+    with tab_anexos:
+        st.markdown('<div class="sec">📎 Anexos de Lançamentos</div>', unsafe_allow_html=True)
+        if tem(cliente, "anexos"):
+            st.caption("Vincule comprovantes, notas fiscais ou contratos (link do Google Drive, Dropbox etc.) a um lançamento.")
+
+            usuario_anx = st.session_state.usuario
+            anexos      = carregar_anexos(usuario_anx)
+
+            cols_lanc   = [c for c in ["data","descricao","categoria","tipo","valor"] if c in df.columns]
+            opcoes_lanc = df[cols_lanc].copy().sort_values("data", ascending=False).head(50)
+            opcoes_lanc["label"] = opcoes_lanc.apply(
+                lambda r: f"{r['data'].strftime('%d/%m/%Y')} — {r['descricao']} — {fmt(r['valor'])}", axis=1)
+
+            with st.expander("➕ Anexar comprovante a um lançamento"):
+                if not opcoes_lanc.empty:
+                    escolha     = st.selectbox("Lançamento", opcoes_lanc["label"].tolist())
+                    nome_anexo  = st.text_input("Nome do anexo", placeholder="Ex: Nota fiscal 1234")
+                    url_anexo   = st.text_input("Link do comprovante", placeholder="https://drive.google.com/...")
+                    if st.button("💾 Salvar anexo", use_container_width=True, type="primary"):
+                        if url_anexo:
+                            if salvar_anexo(usuario_anx, escolha, url_anexo, nome_anexo or "Anexo"):
+                                st.success("✅ Anexo salvo!")
+                                st.rerun()
+                        else:
+                            st.warning("Cole o link do comprovante antes de salvar.")
+                else:
+                    st.info("Nenhum lançamento disponível no período para anexar.")
+
+            if anexos:
+                st.markdown("**📋 Anexos cadastrados**")
+                for a in sorted(anexos, key=lambda x: x["id"], reverse=True):
+                    ca, cb, cc = st.columns([3,3,1])
+                    ca.write(f"**{a['nome']}**")
+                    cb.markdown(f"[🔗 {a['lancamento']}]({a['url']})")
+                    if cc.button("🗑️", key=f"del_anx_{a['id']}", help="Remover"):
+                        if deletar_anexo(a["id"], usuario_anx): st.rerun()
+            else:
+                st.info("Nenhum anexo cadastrado ainda.")
+        else:
+            bloqueio("Anexos de Lançamentos", "Profissional")
 
 
 render_dashboard()
