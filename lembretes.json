@@ -1,11 +1,4 @@
 {
   "demo_emp": [],
-  "JRTS": [
-    {
-      "id": 1787187593584,
-      "descricao": "aluguel",
-      "valor": 300.0,
-      "vencimento": "2026-08-21"
-    }
-  ]
+  "JRTS": []
 }
